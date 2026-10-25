@@ -1,0 +1,5 @@
+# Secrets: never commit your real API key
+.env
+
+node_modules/
+.DS_Store

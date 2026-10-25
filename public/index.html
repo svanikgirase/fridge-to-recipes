@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fridge-to-Recipes</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f6f5f1; color: #222; }
+    main { max-width: 880px; margin: 0 auto; padding: 32px 20px 60px; }
+    h1 { margin: 0 0 4px; }
+    .subtitle { margin: 0 0 24px; color: #666; }
+    form { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; display: grid; gap: 14px; }
+    label { display: grid; gap: 6px; font-weight: 600; font-size: 14px; }
+    textarea, input { width: 100%; min-width: 0; font: inherit; font-weight: 400; padding: 9px 11px; border: 1px solid #ccc; border-radius: 8px; }
+    textarea { min-height: 70px; resize: vertical; }
+    .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    button { font: inherit; font-weight: 600; padding: 11px; border: 0; border-radius: 8px; background: #2f6f4f; color: #fff; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .status { margin: 18px 0 0; color: #555; }
+    .status.error { color: #b3261e; }
+    .recipes { display: grid; gap: 16px; margin-top: 20px; }
+    .card { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 18px 20px; }
+    .card h2 { margin: 0 0 4px; font-size: 20px; }
+    .time { color: #666; margin: 0 0 12px; }
+    .card h3 { margin: 14px 0 6px; font-size: 15px; }
+    .card ul, .card ol { margin: 0; padding-left: 22px; }
+    .card li { margin: 3px 0; }
+    .missing { color: #b3261e; }
+    .tag { font-size: 12px; font-weight: 600; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+    .tag.have { background: #e3f1e8; color: #2f6f4f; }
+    .tag.miss { background: #fbe4e2; color: #b3261e; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Fridge-to-Recipes</h1>
+    <p class="subtitle">Tell us what's in your fridge and get three recipe ideas.</p>
+
+    <form id="form">
+      <label>Ingredients you have (comma-separated)
+        <textarea id="ingredients" required placeholder="eggs, spinach, feta, tomatoes"></textarea>
+      </label>
+      <div class="row">
+        <label>Diet <input id="diet" placeholder="e.g. vegetarian" /></label>
+        <label>Cuisine <input id="cuisine" placeholder="e.g. italian" /></label>
+        <label>Max time (min) <input id="maxTime" type="number" min="1" placeholder="e.g. 30" /></label>
+        <label>Servings <input id="servings" type="number" min="1" placeholder="e.g. 2" /></label>
+      </div>
+      <button id="submit" type="submit">Get recipes</button>
+    </form>
+
+    <p id="status" class="status"></p>
+    <div id="recipes" class="recipes"></div>
+  </main>
+
+  <script>
+    const form = document.getElementById("form");
+    const statusEl = document.getElementById("status");
+    const recipesEl = document.getElementById("recipes");
+    const button = document.getElementById("submit");
+
+    // Small helper: create an element with text (textContent keeps it safe from HTML injection)
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function renderRecipe(recipe) {
+      const card = el("article", undefined, "card");
+      card.append(el("h2", recipe.title));
+      card.append(el("p", recipe.cookTimeMinutes ? `About ${recipe.cookTimeMinutes} minutes` : "Time unknown", "time"));
+
+      card.append(el("h3", "Ingredients"));
+      const list = el("ul");
+      for (const item of recipe.ingredients) {
+        const li = el("li", `${item.quantity ? item.quantity + " " : ""}${item.name}`, item.inFridge ? "" : "missing");
+        li.append(el("span", item.inFridge ? "have" : "missing", item.inFridge ? "tag have" : "tag miss"));
+        list.append(li);
+      }
+      card.append(list);
+
+      card.append(el("h3", "Steps"));
+      const steps = el("ol");
+      for (const step of recipe.steps) steps.append(el("li", step));
+      card.append(steps);
+
+      return card;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      recipesEl.replaceChildren();
+      statusEl.className = "status";
+      statusEl.textContent = "Asking Claude for recipes... this can take a few seconds.";
+
+      const body = {
+        ingredients: document.getElementById("ingredients").value,
+        diet: document.getElementById("diet").value,
+        cuisine: document.getElementById("cuisine").value,
+        maxTime: document.getElementById("maxTime").value,
+        servings: document.getElementById("servings").value,
+      };
+
+      try {
+        const response = await fetch("/api/recipes", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Something went wrong.");
+
+        statusEl.textContent = "";
+        for (const recipe of data.recipes) recipesEl.append(renderRecipe(recipe));
+      } catch (error) {
+        statusEl.className = "status error";
+        statusEl.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

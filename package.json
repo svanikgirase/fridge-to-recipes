@@ -1,0 +1,15 @@
+{
+  "name": "fridge-to-recipes",
+  "version": "1.0.0",
+  "description": "Get three recipe suggestions from the ingredients in your fridge, powered by Claude.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/cli.js",
+    "web": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "license": "MIT"
+}
